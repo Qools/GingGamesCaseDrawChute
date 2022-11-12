@@ -6,8 +6,6 @@ using System.Collections.Generic;
 
 public class TouchDrawer : MonoBehaviour
 {
-    Coroutine drawing;
-
     public GameObject lineRendererPrefab;
 
     private LineRenderer line;
@@ -41,54 +39,68 @@ public class TouchDrawer : MonoBehaviour
                     StartLine();
                 }
             }
-
-           
         }
+
         else if (Input.GetMouseButtonUp(0))
         {
             FinishLine();
+        }
+
+        if (Input.GetMouseButton(0))
+        {
+            pointerEventData = new PointerEventData(eventSystem);
+            pointerEventData.position = Input.mousePosition;
+
+            List<RaycastResult> results = new List<RaycastResult>();
+            
+            drawZoneRayCaster.Raycast(pointerEventData, results);
+
+            foreach (var result in results)
+            {
+                if (result.gameObject.CompareTag(PlayerPrefKeys.drawZone))
+                {
+                    DrawLine();
+                }
+
+                if (result.gameObject.CompareTag(PlayerPrefKeys.otherZone))
+                {
+                    FinishLine();
+                }
+            }
         }
     }
 
     void StartLine()
     {
-        if (drawing != null)
-        {
-            StopCoroutine(drawing);
-        }
-
-        drawing = StartCoroutine(DrawLine());
+        GameObject lineObject = Instantiate(lineRendererPrefab, new Vector3(0, 0, 0), Quaternion.identity);
+        line = lineObject.GetComponent<LineRenderer>();
+        line.positionCount = 0;
 
     }
 
     void FinishLine()
     {
-        if (drawing != null)
-            StopCoroutine(drawing);
-
-        Destroy(line.gameObject);
-
-        BusSystem.CallDrawEnd(lineMesh);
-    }
-
-    IEnumerator DrawLine()
-    {
-
-        GameObject lineObject = Instantiate(lineRendererPrefab, new Vector3(0, 0, 0), Quaternion.identity);
-        line = lineObject.GetComponent<LineRenderer>();
-        line.positionCount = 0;
-
-        while (true)
+        if (line != null)
         {
-            Vector3 position = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y, -Camera.main.transform.position.z));
-            position.z = 0;
-            line.positionCount++;
-            line.SetPosition(line.positionCount - 1, position);
+            Destroy(line.gameObject);
 
-            lineMesh = new Mesh(); 
+            line.Simplify(.05f);
+
+            lineMesh = new Mesh();
             line.BakeMesh(lineMesh);
 
-            yield return null;
+            lineMesh.MarkDynamic();
+            lineMesh.MarkModified();
+
+            BusSystem.CallDrawEnd(lineMesh);
         }
+    }
+
+    private void DrawLine()
+    {
+        Vector3 position = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y, -Camera.main.transform.position.z));
+        position.z = 0;
+        line.positionCount++;
+        line.SetPosition(line.positionCount - 1, position);
     }
 }
